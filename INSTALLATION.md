@@ -60,9 +60,16 @@ The script will:
 - Detect your platform (Windows/Linux/macOS)
 - Download the appropriate liblsl binary
 - Install it to `~/.local/lib/liblsl` (or custom directory)
-- Optionally set `PYLSL_LIB` environment variable
+- Set `PYLSL_LIB` environment variable for the current session
+- **Automatically create/update `.env` file** in repository root (recommended)
 
-**For permanent setup**, add to your shell configuration:
+**Recommended: .env file** (automatically created)
+
+The script automatically creates a `.env` file in the repository root with the correct `PYLSL_LIB` path. This file is automatically loaded when you run the application, so no additional configuration is needed! The `.env` file is git-ignored, so it won't be committed to the repository.
+
+**Alternative: Shell Configuration**
+
+If you prefer to set it system-wide, add to your shell configuration:
 
 **Linux/macOS** (`~/.bashrc` or `~/.zshrc`):
 ```bash
@@ -84,6 +91,7 @@ setx PYLSL_LIB "$HOME\.local\lib\liblsl\bin\lsl.dll"
 - ✅ No mixing of package managers
 - ✅ Easy to update (just re-run script)
 - ✅ Library auto-detection built into the code
+- ✅ Automatic `.env` file creation (no manual shell configuration needed)
 
 **Cons**:
 - Requires internet connection for first download

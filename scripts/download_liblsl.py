@@ -8,7 +8,14 @@ import sys
 import tarfile
 import zipfile
 from pathlib import Path
+from typing import Optional
 from urllib.request import urlretrieve
+
+try:
+    from dotenv import dotenv_values, set_key
+except ImportError:
+    dotenv_values = None
+    set_key = None
 
 # liblsl release information
 LIBLSL_RELEASE_URL = "https://github.com/sccn/liblsl/releases/download/v1.16.2"
@@ -430,19 +437,62 @@ def setup_liblsl(libs_dir: Path = None) -> Path:
         raise
 
 
+def _find_repo_root() -> Optional[Path]:
+    """Find repository root by looking for pyproject.toml or .git directory.
+    
+    Returns:
+        Path to repository root if found, None otherwise
+    """
+    current = Path(__file__).resolve()
+    # Start from this file and walk up to find repo root
+    for parent in [current] + list(current.parents):
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            return parent
+    return None
+
+
+def _write_to_env_file(lib_path: Path):
+    """Write PYLSL_LIB to .env file in repository root."""
+    if set_key is None:
+        return False
+    
+    repo_root = _find_repo_root()
+    if not repo_root:
+        return False
+    
+    env_path = repo_root / ".env"
+    lib_path_str = str(lib_path.absolute())
+    
+    try:
+        # Use set_key to update or add PYLSL_LIB in .env file
+        set_key(env_path, "PYLSL_LIB", lib_path_str)
+        print(f"✓ Wrote PYLSL_LIB to {env_path}")
+        return True
+    except Exception as e:
+        print(f"Warning: Could not write to .env file: {e}")
+        return False
+
+
 def set_pylsl_lib_env(lib_path: Path):
-    """Set PYLSL_LIB environment variable."""
+    """Set PYLSL_LIB environment variable and optionally write to .env file."""
     lib_path_str = str(lib_path.absolute())
     os.environ["PYLSL_LIB"] = lib_path_str
     print(f"✓ Set PYLSL_LIB={lib_path_str}")
     
-    # Also print instructions for permanent setup
-    print("\nTo make this permanent, add to your shell configuration:")
-    if platform.system() == "Windows":
-        print(f'  setx PYLSL_LIB "{lib_path_str}"')
+    # Try to write to .env file
+    env_written = _write_to_env_file(lib_path)
+    
+    if not env_written:
+        # Also print instructions for permanent setup if .env write failed
+        print("\nTo make this permanent, add to your shell configuration:")
+        if platform.system() == "Windows":
+            print(f'  setx PYLSL_LIB "{lib_path_str}"')
+        else:
+            print(f'  export PYLSL_LIB="{lib_path_str}"')
+            print("  Add this line to ~/.bashrc or ~/.zshrc")
     else:
-        print(f'  export PYLSL_LIB="{lib_path_str}"')
-        print("  Add this line to ~/.bashrc or ~/.zshrc")
+        print("\n✓ PYLSL_LIB has been saved to .env file in the repository root.")
+        print("  The .env file will be automatically loaded when running the application.")
 
 
 def main():

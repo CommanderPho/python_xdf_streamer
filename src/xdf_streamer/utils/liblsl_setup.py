@@ -5,18 +5,53 @@ import platform
 from pathlib import Path
 from typing import Optional
 
+try:
+    from dotenv import load_dotenv
+except ImportError:
+    load_dotenv = None
+
+
+def _find_repo_root() -> Optional[Path]:
+    """Find repository root by looking for pyproject.toml or .git directory.
+    
+    Returns:
+        Path to repository root if found, None otherwise
+    """
+    current = Path(__file__).resolve()
+    # Start from this file and walk up to find repo root
+    for parent in [current] + list(current.parents):
+        if (parent / "pyproject.toml").exists() or (parent / ".git").exists():
+            return parent
+    return None
+
+
+def _load_env_file():
+    """Load .env file from repository root if it exists."""
+    if load_dotenv is None:
+        return
+    
+    repo_root = _find_repo_root()
+    if repo_root:
+        env_path = repo_root / ".env"
+        if env_path.exists():
+            load_dotenv(env_path, override=False)
+
 
 def find_liblsl() -> Optional[Path]:
     """Find liblsl library file.
     
     Checks in order:
-    1. PYLSL_LIB environment variable
-    2. Common installation locations
-    3. System library paths
+    1. PYLSL_LIB environment variable (highest priority)
+    2. .env file in repository root
+    3. Common installation locations
+    4. System library paths
     
     Returns:
         Path to liblsl library if found, None otherwise
     """
+    # Load .env file from repository root (before checking environment variable)
+    _load_env_file()
+    
     system = platform.system()
     
     # Library names by platform
@@ -29,7 +64,7 @@ def find_liblsl() -> Optional[Path]:
     if not lib_name:
         return None
     
-    # Check PYLSL_LIB environment variable first
+    # Check PYLSL_LIB environment variable first (may be set by .env or system)
     pylsl_lib = os.environ.get("PYLSL_LIB")
     if pylsl_lib:
         lib_path = Path(pylsl_lib)

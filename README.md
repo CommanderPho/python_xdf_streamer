@@ -43,13 +43,14 @@ This will automatically:
 - Download the correct liblsl binary
 - Install it to `~/.local/lib/liblsl`
 - Set the `PYLSL_LIB` environment variable
+- **Create/update `.env` file** in repository root (automatically loaded)
 
 **Alternative: Manual Setup**
 - Download from: https://github.com/sccn/liblsl/releases
-- Extract and set `PYLSL_LIB` environment variable
+- Extract and set `PYLSL_LIB` environment variable or add to `.env` file
 - See [INSTALLATION.md](INSTALLATION.md) for detailed instructions
 
-**For permanent setup**, add to your shell config:
+**Note**: The `.env` file is automatically created and loaded, so no manual shell configuration is needed. If you prefer system-wide setup, add to your shell config:
 - Linux/macOS: `export PYLSL_LIB="$HOME/.local/lib/liblsl/lib/liblsl.so"`
 - Windows: `setx PYLSL_LIB "$HOME\.local\lib\liblsl\bin\lsl.dll"`
 
@@ -140,12 +141,9 @@ uv sync --all-extras
 
 # 2. Install liblsl (automatic, cross-platform)
 uv run python scripts/download_liblsl.py --set-env
+# This automatically creates a .env file - no additional configuration needed!
 
-# 3. Make PYLSL_LIB permanent (add to shell config)
-# Linux/macOS: export PYLSL_LIB="$HOME/.local/lib/liblsl/lib/liblsl.so"
-# Windows: setx PYLSL_LIB "%USERPROFILE%\.local\lib\liblsl\bin\lsl.dll"
-
-# 4. Run the application
+# 3. Run the application
 uv run python src/main.py
 ```
 

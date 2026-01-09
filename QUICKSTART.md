@@ -20,6 +20,7 @@ This will:
 - ✅ Install it to `~/.local/lib/liblsl`
 - ✅ Create the `liblsl.so` symlink (Linux/macOS)
 - ✅ Set `PYLSL_LIB` for the current session
+- ✅ Automatically create/update `.env` file in repository root (recommended)
 
 **Note**: If you already ran the script before the symlink fix, run:
 ```bash
@@ -27,6 +28,14 @@ uv run python scripts/fix_liblsl_symlink.py
 ```
 
 ## 3. Make PYLSL_LIB Permanent
+
+**Recommended: Use .env file** (automatically created by the script)
+
+The `--set-env` flag automatically creates a `.env` file in the repository root with the correct `PYLSL_LIB` path. This file is automatically loaded when you run the application, so no additional configuration is needed!
+
+**Alternative: Shell Configuration**
+
+If you prefer to set it system-wide, you can add it to your shell configuration:
 
 ### Linux/macOS
 

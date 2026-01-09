@@ -9,6 +9,7 @@ A comprehensive Python script that:
 - ✅ **Downloads correct binary**: Automatically selects the right liblsl release for your platform
 - ✅ **Installs to standard location**: `~/.local/lib/liblsl` (cross-platform)
 - ✅ **Sets environment variable**: Optional `--set-env` flag
+- ✅ **Creates .env file**: Automatically writes `PYLSL_LIB` to `.env` in repository root
 - ✅ **Handles extraction**: Supports both `.tar.bz2` (Unix) and `.zip` (Windows)
 - ✅ **Progress indication**: Shows download progress
 - ✅ **Error handling**: Clear error messages and cleanup
@@ -16,13 +17,14 @@ A comprehensive Python script that:
 ### 2. Library Detection Module (`src/xdf_streamer/utils/liblsl_setup.py`)
 
 Automatic library finding that checks:
-1. `PYLSL_LIB` environment variable (highest priority)
-2. Common installation locations:
+1. `PYLSL_LIB` environment variable (highest priority - system or shell config)
+2. `.env` file in repository root (automatically loaded)
+3. Common installation locations:
    - `~/.local/lib/liblsl/lib/` (Linux/macOS)
    - `~/.local/lib/liblsl/bin/` (Windows)
    - `~/libs/liblsl/`
    - System paths (`/usr/local/lib`, `/usr/lib`)
-3. System library search (Unix-like systems)
+4. System library search (Unix-like systems)
 
 ### 3. Integration with Core Modules
 
@@ -52,25 +54,29 @@ Automatic library finding that checks:
 ### Linux
 ```bash
 uv run python scripts/download_liblsl.py --set-env
-export PYLSL_LIB="$HOME/.local/lib/liblsl/lib/liblsl.so"  # Add to ~/.bashrc
+# .env file is automatically created - no additional configuration needed!
+# Alternative: export PYLSL_LIB="$HOME/.local/lib/liblsl/lib/liblsl.so"  # Add to ~/.bashrc
 ```
 
 ### macOS
 ```bash
 uv run python scripts/download_liblsl.py --set-env
-export PYLSL_LIB="$HOME/.local/lib/liblsl/lib/liblsl.dylib"  # Add to ~/.zshrc
+# .env file is automatically created - no additional configuration needed!
+# Alternative: export PYLSL_LIB="$HOME/.local/lib/liblsl/lib/liblsl.dylib"  # Add to ~/.zshrc
 ```
 
 ### Windows (PowerShell)
 ```powershell
 uv run python scripts/download_liblsl.py --set-env
-$env:PYLSL_LIB = "$HOME\.local\lib\liblsl\bin\lsl.dll"  # Add to profile
+# .env file is automatically created - no additional configuration needed!
+# Alternative: $env:PYLSL_LIB = "$HOME\.local\lib\liblsl\bin\lsl.dll"  # Add to profile
 ```
 
 ### Windows (Command Prompt)
 ```cmd
 uv run python scripts/download_liblsl.py --set-env
-setx PYLSL_LIB "%USERPROFILE%\.local\lib\liblsl\bin\lsl.dll"
+REM .env file is automatically created - no additional configuration needed!
+REM Alternative: setx PYLSL_LIB "%USERPROFILE%\.local\lib\liblsl\bin\lsl.dll"
 ```
 
 ## File Structure
@@ -82,6 +88,8 @@ python_xdf_streamer/
 │   └── README.md               # Script documentation
 ├── src/xdf_streamer/utils/
 │   └── liblsl_setup.py         # Library detection
+├── .env.example                # Template for .env file
+├── .env                        # Local configuration (git-ignored)
 ├── QUICKSTART.md               # Quick setup guide
 ├── INSTALLATION.md              # Detailed installation guide
 └── CROSS_PLATFORM_SETUP.md      # This file
@@ -108,6 +116,7 @@ This verifies:
 4. **Standard Locations**: Uses `~/.local/lib/` convention
 5. **Auto-Detection**: Code automatically finds liblsl if installed
 6. **Clear Errors**: Helpful messages if liblsl not found
+7. **.env File Support**: Automatic `.env` file creation - no manual shell configuration needed
 
 ## Future Enhancements
 

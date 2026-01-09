@@ -5,7 +5,22 @@
 		},
 		{
 			"path": "../PhoPyLSLhelper"
+		},
+		{
+			"path": "../PhoLogToLabStreamingLayer"
+		},
+		{
+			"path": "../lab-recorder-python"
 		}
 	],
-	"settings": {}
+	"settings": {
+		"files.exclude": {
+			".specstory/**": true,
+			"*.egg-info": true,
+			"**/__pycache__": true,
+			"**/.venv*/": true,
+			"desktop.ini": true
+		},
+		"explorer.excludeGitIgnore": false
+	}
 }
