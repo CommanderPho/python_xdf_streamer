@@ -9,6 +9,7 @@ dependencies = [
     "pyxdf>=1.16.0",
     "numpy>=1.24.0",
     "PyQt6>=6.5.0",
+    "phopylslhelper",
 ]
 
 [project.optional-dependencies]
@@ -34,6 +35,9 @@ target-version = ['py310']
 [tool.ruff]
 line-length = 100
 target-version = "py310"
+
+[tool.uv.sources]
+phopylslhelper = { path = "../PhoPyLSLhelper", editable = true }
 
 
 [dependency-groups]
