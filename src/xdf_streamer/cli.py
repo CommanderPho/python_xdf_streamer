@@ -68,9 +68,9 @@ def main():
 
         print(f"Created {len(outlets)} LSL outlet(s)")
         for i, outlet in enumerate(outlets):
-            info = outlet.info()
             stream_id = stream_ids[i] if stream_ids else i
-            print(f"  Outlet {i} (Stream {stream_id}): {info.name()}")
+            stream_info = xdf_data.streams[stream_id]
+            print(f"  Outlet {i} (Stream {stream_id}): {stream_info.name}")
 
         print("\nStreaming... Press Ctrl+C to stop")
 

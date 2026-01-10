@@ -42,8 +42,8 @@ def main():
 
         print(f"Created {len(outlets)} LSL outlet(s)")
         for i, outlet in enumerate(outlets):
-            info = outlet.info()
-            print(f"  Outlet {i}: {info.name()} ({info.channel_count()} channels, {info.nominal_srate()} Hz)")
+            stream_info = rebroadcaster.get_stream_info(i)
+            print(f"  Outlet {i}: {stream_info.name} ({stream_info.channel_count} channels, {stream_info.sampling_rate} Hz)")
 
         print("\nStreaming... Press Ctrl+C to stop")
         # Wait for streaming to complete or interrupt

@@ -1,5 +1,6 @@
 """Main GUI window for XDF Streamer."""
 
+import logging
 import threading
 from pathlib import Path
 from typing import List, Optional
@@ -28,6 +29,8 @@ from ..core.stream_worker import StreamWorker
 from ..core.xdf_loader import XdfLoader
 from ..models.xdf_data import XdfData
 from ..utils.validators import validate_stream
+
+logger = logging.getLogger(__name__)
 
 
 class MainWindow(QWidget):
@@ -190,10 +193,15 @@ class MainWindow(QWidget):
                 self.load_button.setText("Unload")
                 self.stream_button.setEnabled(True)
                 self.stream_ready = False
+                logger.info(f"Successfully loaded XDF file: {file_path}")
             except FileNotFoundError:
-                QMessageBox.warning(self, "XDF Streamer", f"Unable to find {file_path}\nPlease check your path")
+                error_msg = f"Unable to find {file_path}\nPlease check your path"
+                logger.error(error_msg)
+                QMessageBox.warning(self, "XDF Streamer", error_msg)
             except Exception as e:
-                QMessageBox.warning(self, "XDF Streamer", f"Error loading XDF file: {e}")
+                error_msg = f"Error loading XDF file: {e}"
+                logger.error(error_msg, exc_info=True)
+                QMessageBox.warning(self, "XDF Streamer", error_msg)
         else:
             self._clear_cache()
 
@@ -277,33 +285,39 @@ class MainWindow(QWidget):
 
     def _start_synthetic_streaming(self):
         """Start synthetic signal streaming."""
-        sampling_rate = self.sampling_rate_spin.value()
-        channel_count = self.channel_count_spin.value()
-        stream_name = self.stream_name_edit.text()
-        stream_type = self.stream_type_edit.text()
+        try:
+            sampling_rate = self.sampling_rate_spin.value()
+            channel_count = self.channel_count_spin.value()
+            stream_name = self.stream_name_edit.text()
+            stream_type = self.stream_type_edit.text()
 
-        # Create synthetic stream info
-        from ..models.stream_info import StreamInfo
-        format_map = {"cf_float32": "float32", "cf_double64": "double64", "cf_int8": "int8", "cf_int16": "int16", "cf_int32": "int32", "cf_int64": "int64", "cf_string": "string"}
-        channel_format = format_map.get(self.format_combo.currentText(), "double64")
+            # Create synthetic stream info
+            from ..models.stream_info import StreamInfo
+            format_map = {"cf_float32": "float32", "cf_double64": "double64", "cf_int8": "int8", "cf_int16": "int16", "cf_int32": "int32", "cf_int64": "int64", "cf_string": "string"}
+            channel_format = format_map.get(self.format_combo.currentText(), "double64")
 
-        stream_info = StreamInfo(
-            name=stream_name,
-            type=stream_type,
-            channel_count=channel_count,
-            sampling_rate=float(sampling_rate),
-            channel_format=channel_format,
-            channels=[],
-            stream_id=0,
-        )
+            stream_info = StreamInfo(
+                name=stream_name,
+                type=stream_type,
+                channel_count=channel_count,
+                sampling_rate=float(sampling_rate),
+                channel_format=channel_format,
+                channels=[],
+                stream_id=0,
+            )
 
-        outlet = self.lsl_streamer.create_outlet(stream_info)
-        self.outlets.append(outlet)
+            outlet = self.lsl_streamer.create_outlet(stream_info)
+            self.outlets.append(outlet)
 
-        worker = StreamWorker(self.stop_event)
-        thread = threading.Thread(target=worker.stream_synthetic_data, args=(outlet, sampling_rate, channel_count), daemon=True)
-        thread.start()
-        self.stream_threads.append(thread)
+            worker = StreamWorker(self.stop_event)
+            thread = threading.Thread(target=worker.stream_synthetic_data, args=(outlet, sampling_rate, channel_count), daemon=True)
+            thread.start()
+            self.stream_threads.append(thread)
+            logger.info(f"Started synthetic streaming thread for {stream_name}")
+        except Exception as e:
+            logger.error(f"Error starting synthetic streaming: {e}", exc_info=True)
+            QMessageBox.critical(self, "Error", f"Failed to start synthetic streaming:\n{e}")
+            self._stop_streaming()
 
     def _start_xdf_streaming(self):
         """Start XDF file streaming."""
@@ -321,24 +335,30 @@ class MainWindow(QWidget):
                 if not is_valid:
                     continue
 
-                outlet = self.lsl_streamer.create_outlet(stream_info)
-                self.outlets.append(outlet)
+                try:
+                    outlet = self.lsl_streamer.create_outlet(stream_info)
+                    self.outlets.append(outlet)
 
-                worker = StreamWorker(self.stop_event)
+                    worker = StreamWorker(self.stop_event)
 
-                def create_complete_callback():
-                    def callback():
-                        self._on_stream_complete()
+                    def create_complete_callback():
+                        def callback():
+                            self._on_stream_complete()
 
-                    return callback
+                        return callback
 
-                thread = threading.Thread(
-                    target=worker.stream_xdf_data,
-                    args=(i, outlet, self.xdf_data, create_complete_callback()),
-                    daemon=True,
-                )
-                thread.start()
-                self.stream_threads.append(thread)
+                    thread = threading.Thread(
+                        target=worker.stream_xdf_data,
+                        args=(i, outlet, self.xdf_data, create_complete_callback()),
+                        daemon=True,
+                    )
+                    thread.start()
+                    self.stream_threads.append(thread)
+                    logger.info(f"Started XDF streaming thread for stream {i}: {stream_info.name}")
+                except Exception as e:
+                    logger.error(f"Error starting XDF streaming for stream {i}: {e}", exc_info=True)
+                    QMessageBox.critical(self, "Error", f"Failed to start streaming for {stream_info.name}:\n{e}")
+                    item.setCheckState(0, Qt.CheckState.Unchecked)
 
     def _stop_streaming(self):
         """Stop streaming."""
@@ -389,7 +409,9 @@ class MainWindow(QWidget):
         # Set sampling rate from first non-string stream
         for stream_info in self.xdf_data.streams:
             if stream_info.channel_format != "string":
-                self.sampling_rate_spin.setValue(int(stream_info.sampling_rate))
+                # Ensure sampling_rate is a float before converting to int
+                rate = float(stream_info.sampling_rate) if isinstance(stream_info.sampling_rate, str) else stream_info.sampling_rate
+                self.sampling_rate_spin.setValue(int(rate))
                 break
 
         for i, stream_info in enumerate(self.xdf_data.streams):

@@ -79,6 +79,14 @@ class XdfLoader:
 
         # Get channel count
         channel_count = info.get("channel_count", [0])[0] if isinstance(info.get("channel_count"), list) else info.get("channel_count", 0)
+        # Ensure it's an int (handle string values from XDF)
+        if isinstance(channel_count, str):
+            channel_count = int(float(channel_count))  # Convert string -> float -> int
+        elif channel_count is not None:
+            channel_count = int(channel_count)
+        else:
+            channel_count = 0
+        
         if channel_count == 0 and "time_series" in stream and stream["time_series"] is not None:
             time_series = np.array(stream["time_series"])
             if time_series.ndim == 1:
@@ -88,6 +96,11 @@ class XdfLoader:
 
         # Get sampling rate
         nominal_srate = info.get("nominal_srate", [0.0])[0] if isinstance(info.get("nominal_srate"), list) else info.get("nominal_srate", 0.0)
+        # Ensure it's a float (handle string values from XDF)
+        if isinstance(nominal_srate, str):
+            nominal_srate = float(nominal_srate)
+        else:
+            nominal_srate = float(nominal_srate) if nominal_srate is not None else 0.0
 
         # Parse channel information
         channels = []

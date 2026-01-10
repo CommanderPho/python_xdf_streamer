@@ -1,5 +1,6 @@
 """Thread worker for streaming data."""
 
+import logging
 import random
 import threading
 import time
@@ -18,6 +19,8 @@ import pylsl
 
 from ..models.xdf_data import XdfData
 from ..utils.timing import calculate_sleep_duration, get_precise_time
+
+logger = logging.getLogger(__name__)
 
 
 class StreamWorker:
@@ -40,52 +43,62 @@ class StreamWorker:
             xdf_data: XDF data container
             on_complete: Optional callback when streaming completes
         """
-        if stream_id not in xdf_data.time_series:
-            raise ValueError(f"Stream {stream_id} not found in XDF data")
+        try:
+            if stream_id not in xdf_data.time_series:
+                raise ValueError(f"Stream {stream_id} not found in XDF data")
 
-        stream_info = xdf_data.streams[stream_id]
-        time_series = xdf_data.time_series[stream_id]
+            stream_info = xdf_data.streams[stream_id]
+            time_series = xdf_data.time_series[stream_id]
 
-        sampling_rate = stream_info.sampling_rate
-        channel_count = stream_info.channel_count
-        sampling_interval = 1.0 / sampling_rate if sampling_rate > 0 else 0.0
+            # Ensure sampling_rate is a float (defensive check)
+            sampling_rate = float(stream_info.sampling_rate) if not isinstance(stream_info.sampling_rate, (int, float)) else float(stream_info.sampling_rate)
+            # Ensure channel_count is an int (defensive check)
+            channel_count = int(float(stream_info.channel_count)) if isinstance(stream_info.channel_count, str) else int(stream_info.channel_count) if stream_info.channel_count is not None else 0
+            sampling_interval = 1.0 / sampling_rate if sampling_rate > 0 else 0.0
 
-        start_time = get_precise_time()
+            logger.info(f"Starting XDF stream {stream_id}: {stream_info.name} (rate: {sampling_rate} Hz, channels: {channel_count})")
+            start_time = get_precise_time()
 
-        # Ensure time_series is samples x channels
-        if time_series.ndim == 1:
-            time_series = time_series.reshape(-1, 1)
-        elif time_series.shape[0] < time_series.shape[1] and time_series.shape[1] == channel_count:
-            time_series = time_series.T
+            # Ensure time_series is samples x channels
+            if time_series.ndim == 1:
+                time_series = time_series.reshape(-1, 1)
+            elif time_series.shape[0] < time_series.shape[1] and time_series.shape[1] == channel_count:
+                time_series = time_series.T
 
-        num_samples = time_series.shape[0]
+            num_samples = time_series.shape[0]
 
-        for t in range(num_samples):
-            if self.stop_event.is_set():
-                break
+            for t in range(num_samples):
+                if self.stop_event.is_set():
+                    logger.info(f"Stream {stream_id} stopped by user")
+                    break
 
-            # Calculate target time
-            target_time = start_time + t * sampling_interval
-            sleep_duration = calculate_sleep_duration(target_time)
+                # Calculate target time
+                target_time = start_time + t * sampling_interval
+                sleep_duration = calculate_sleep_duration(target_time)
 
-            if sleep_duration > 0:
-                time.sleep(sleep_duration)
+                if sleep_duration > 0:
+                    time.sleep(sleep_duration)
 
-            # Extract sample (row t)
-            sample = time_series[t, :].tolist()
+                # Extract sample (row t)
+                sample = time_series[t, :].tolist()
 
-            # Ensure correct number of channels
-            if len(sample) != channel_count:
-                sample = sample[:channel_count] if len(sample) > channel_count else sample + [0.0] * (channel_count - len(sample))
+                # Ensure correct number of channels
+                if len(sample) != channel_count:
+                    sample = sample[:channel_count] if len(sample) > channel_count else sample + [0.0] * (channel_count - len(sample))
 
-            try:
-                outlet.push_sample(sample)
-            except Exception as e:
-                print(f"Error pushing sample: {e}")
-                break
+                try:
+                    outlet.push_sample(sample)
+                except Exception as e:
+                    logger.error(f"Error pushing sample for stream {stream_id} at sample {t}: {e}", exc_info=True)
+                    break
 
-        if on_complete:
-            on_complete()
+            logger.info(f"Stream {stream_id} completed ({num_samples} samples)")
+            if on_complete:
+                on_complete()
+        except Exception as e:
+            logger.error(f"Fatal error in stream_xdf_data for stream {stream_id}: {e}", exc_info=True)
+            if on_complete:
+                on_complete()
 
     def stream_synthetic_data(self, outlet: pylsl.StreamOutlet, sampling_rate: int, channel_count: int) -> None:
         """Stream synthetic random data to LSL outlet.
@@ -95,24 +108,30 @@ class StreamWorker:
             sampling_rate: Sampling rate in Hz
             channel_count: Number of channels
         """
-        sampling_interval = 1.0 / sampling_rate
-        start_time = get_precise_time()
+        try:
+            logger.info(f"Starting synthetic stream (rate: {sampling_rate} Hz, channels: {channel_count})")
+            sampling_interval = 1.0 / sampling_rate
+            start_time = get_precise_time()
 
-        t = 0
-        while not self.stop_event.is_set():
-            target_time = start_time + t * sampling_interval
-            sleep_duration = calculate_sleep_duration(target_time)
+            t = 0
+            while not self.stop_event.is_set():
+                target_time = start_time + t * sampling_interval
+                sleep_duration = calculate_sleep_duration(target_time)
 
-            if sleep_duration > 0:
-                time.sleep(sleep_duration)
+                if sleep_duration > 0:
+                    time.sleep(sleep_duration)
 
-            # Generate random sample
-            sample = [(random.random() * 3.0 - 1.5) for _ in range(channel_count)]
+                # Generate random sample
+                sample = [(random.random() * 3.0 - 1.5) for _ in range(channel_count)]
 
-            try:
-                outlet.push_sample(sample)
-            except Exception as e:
-                print(f"Error pushing sample: {e}")
-                break
+                try:
+                    outlet.push_sample(sample)
+                except Exception as e:
+                    logger.error(f"Error pushing synthetic sample at iteration {t}: {e}", exc_info=True)
+                    break
 
-            t += 1
+                t += 1
+
+            logger.info(f"Synthetic stream stopped after {t} samples")
+        except Exception as e:
+            logger.error(f"Fatal error in stream_synthetic_data: {e}", exc_info=True)
