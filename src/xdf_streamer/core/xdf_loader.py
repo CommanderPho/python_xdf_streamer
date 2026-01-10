@@ -92,7 +92,7 @@ class XdfLoader:
         # Parse channel information
         channels = []
         desc = info.get("desc", {})
-        if desc:
+        if desc and isinstance(desc, dict):
             chns = desc.get("channels", {})
             if chns:
                 chn_list = chns.get("channel", [])
