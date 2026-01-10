@@ -5,7 +5,7 @@ import threading
 from pathlib import Path
 from typing import List, Optional
 
-from PyQt6.QtCore import Qt, pyqtSignal
+from PyQt6.QtCore import Qt, pyqtSignal, QSettings
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -55,6 +55,10 @@ class MainWindow(QWidget):
         # State
         self.stream_ready = False
         self.is_streaming = False
+
+        # Settings
+        self.settings = QSettings("python-xdf-streamer", "xdf-streamer")
+        self.last_xdf_directory = self.settings.value("last_xdf_directory", "", type=str)
 
         self._init_ui()
 
@@ -174,8 +178,12 @@ class MainWindow(QWidget):
 
     def _on_browse_clicked(self):
         """Handle browse button click."""
-        file_path, _ = QFileDialog.getOpenFileName(self, "Open XDF File", "", "XDF Files (*.xdf)")
+        file_path, _ = QFileDialog.getOpenFileName(self, "Open XDF File", self.last_xdf_directory, "XDF Files (*.xdf)")
         if file_path:
+            # Save the directory of the selected file
+            file_dir = str(Path(file_path).parent)
+            self.last_xdf_directory = file_dir
+            self.settings.setValue("last_xdf_directory", file_dir)
             self._clear_cache()
             self.file_path_edit.setText(file_path)
             self._on_load_clicked()
