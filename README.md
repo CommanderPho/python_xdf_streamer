@@ -82,6 +82,59 @@ Check "Generate Random Signals" to stream synthetic test data:
 - Configure channel count, stream name, type, and format
 - Useful for testing without XDF files
 
+### CLI Mode (Multi-Stream Rebroadcasting)
+
+Rebroadcast XDF file streams via command line:
+
+```bash
+# List available streams in an XDF file
+uv run python -m xdf_streamer.cli path/to/file.xdf --list-streams
+
+# Rebroadcast all streams
+uv run python -m xdf_streamer.cli path/to/file.xdf
+
+# Rebroadcast selected streams (e.g., streams 0, 1, and 2)
+uv run python -m xdf_streamer.cli path/to/file.xdf --streams 0,1,2
+```
+
+Or use the installed CLI command (after installation):
+```bash
+xdf-rebroadcast path/to/file.xdf --list-streams
+xdf-rebroadcast path/to/file.xdf --streams 0,1,2
+```
+
+### Programmatic API (Multi-Stream Rebroadcasting)
+
+Use the `MultiStreamRebroadcaster` class for programmatic control:
+
+```python
+from xdf_streamer.core.multi_stream_rebroadcaster import MultiStreamRebroadcaster
+from pathlib import Path
+
+# Create rebroadcaster
+rebroadcaster = MultiStreamRebroadcaster()
+
+# Load XDF file
+xdf_data = rebroadcaster.load_xdf(Path("path/to/file.xdf"))
+
+# Start rebroadcasting all streams
+outlets = rebroadcaster.start_rebroadcast()
+
+# Or rebroadcast only selected streams
+outlets = rebroadcaster.start_rebroadcast(stream_ids=[0, 2])
+
+# Stop rebroadcasting
+rebroadcaster.stop_rebroadcast()
+
+# Or use as context manager (automatically stops on exit)
+with MultiStreamRebroadcaster() as rebroadcaster:
+    rebroadcaster.load_xdf(Path("path/to/file.xdf"))
+    outlets = rebroadcaster.start_rebroadcast()
+    # Streaming continues until context exits
+```
+
+See `examples/multi_stream_rebroadcast_example.py` for more examples.
+
 ## Project Structure
 
 ```
