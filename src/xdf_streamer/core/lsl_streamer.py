@@ -63,6 +63,7 @@ class LslStreamer:
             for channel in stream_info.channels:
                 chn = desc.append_child("channel")
                 for key, value in channel.items():
-                    chn.append_child_value(key, str(value))
+                    v = value[0] if isinstance(value, list) and value else value
+                    chn.append_child_value(key, str(v))
 
         return info
