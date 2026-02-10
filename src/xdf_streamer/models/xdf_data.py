@@ -1,7 +1,8 @@
 """XDF data container."""
 
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Tuple, Optional, Any
+from datetime import datetime, timezone
 
 import numpy as np
 from attrs import define, field, Factory
@@ -20,3 +21,5 @@ class XdfData:
     xdf_header: Dict = field(default=Factory(dict))
 
     loaded: bool = field(default=False)
+    file_datetime: Optional[datetime] = field(default=None)
+

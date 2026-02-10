@@ -3,14 +3,15 @@
 from datetime import datetime, timezone
 from copy import deepcopy
 from typing import Dict, List, Tuple, Optional, Callable, Union, Any
-from nptyping import NDArray
 
 from pathlib import Path
 import numpy as np
 import pandas as pd
 import pyxdf
+import mne
+from benedict import benedict
 
-from phopylslhelper.core.data_modalities import DataModalityType
+from phopylslhelper.core.data_modalities import DataModalityType, lab_recorder_to_mne_to_type_dict
 from phopylslhelper.general_helpers import unwrap_single_element_listlike_if_needed, readable_dt_str, from_readable_dt_str, localize_datetime_to_timezone, tz_UTC, tz_Eastern, _default_tz
 from phopylslhelper.easy_time_sync import EasyTimeSyncParsingMixin
 
@@ -55,16 +56,32 @@ class XdfLoader:
         self.xdf_data = XdfData(xdf_streams=streams, xdf_header=header, file_path=file_path)
         # self.xdf_data.file_path = file_path
 
+        header = self.xdf_data.xdf_header
+        try:
+            if (header is not None) and (self.xdf_data.file_datetime is None):
+            # if file_datetime is None:
+                file_datetime: datetime = datetime.strptime(header['info']['datetime'][0], "%Y-%m-%dT%H:%M:%S%z") # '2025-09-11T17:04:20-0400' -> datetime.datetime(2025, 9, 11, 17, 4, 20, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=72000)))           
+                file_datetime = file_datetime.astimezone(timezone.utc)
+                self.xdf_data.file_datetime = file_datetime
+        except Exception as e:
+            print(f'failed to parse file_datetime from header with error: {e}. Skipping.')
+            # raise e
+            pass
+
         for stream_id, stream in enumerate(streams):
             parsed_stream_successfully: bool = False
+            stream_info_dict = {}
             try:
-                stream_info_dict, stream_datetimes, stream_timestamp_df = self._try_pho_custom_parse_stream_info(stream=stream, stream_id=stream_id)
-                streams_timestamp_dfs[name] = stream_timestamp_df
-                stream_info = StreamInfo(**stream_info_dict, stream_id=stream_id)
+                stream_info_dict, stream_datetimes, stream_timestamp_df = self._try_pho_custom_parse_stream_info(stream=stream, stream_id=stream_id, file_datetime=self.xdf_data.file_datetime)
+                # streams_timestamp_dfs[name] = stream_timestamp_df
+                if 'channels' not in stream_info_dict:
+                    stream_info_dict['channels'] = None
+                stream_info = StreamInfo(**stream_info_dict) # , stream_id=stream_id
 
                 parsed_stream_successfully = True
             except Exception as e:
-                raise e
+                print(f'\terror: {e}. Skipping.')
+                # raise e
 
 
             if not parsed_stream_successfully:
@@ -131,8 +148,6 @@ class XdfLoader:
                 else:
                     print(f'_try_helper_parse_custom_stream_info(stream: {stream}, ...): \n\terror: {e}\n\tcontinuing...')
 
-                
-
         ## try to get the special marker timestamp helpers:
         try:
             desc_info_dict = dict(stream['info'].get('desc', [{}])[0])
@@ -142,11 +157,74 @@ class XdfLoader:
                 raise
             else:
                 print(f'_try_helper_parse_custom_stream_info(stream: {stream}, ...): \n\terror: {e}\n\tcontinuing...')
-        
+
+
+
+        ## try to get the special marker timestamp helpers:
+        try:
+            fs = stream_info_dict.get('fs', None)
+
+            if (fs == 0):  
+                # irregular event streams
+                _channels_dict = benedict(stream['info']['desc'][0]['channels'][0])
+                channels_df: pd.DataFrame = pd.DataFrame.from_records([{k:v[0] for k, v in ch_v.items()} for ch_v in _channels_dict.flatten()['channel']])
+                ch_names = channels_df['label'].to_list()
+                ch_types = [lab_recorder_to_mne_to_type_dict[v] for v in channels_df['type']]
+
+                # ch_names = ['TextLogger_Markers']
+                # ch_types = ['misc']
+                # logger_strings = [unwrap_single_element_listlike_if_needed(v) for v in stream['time_series']]
+                # assert len(stream_timestamps) == len(logger_strings), f"len(stream_timestamps): {len(stream_timestamps)} != len(logger_strings): {len(logger_strings)}"
+
+                # ## check
+                # assert ((stream_info_dict['created_at_dt'] - self.file_datetime).total_seconds() < (90.0 * 60.0)) # should be less than 10 seconds between the file start and the logging stream (usually...)
+
+                # # # a_raw_df: pd.DataFrame = pd.DataFrame(dict(onset=zeroed_stream_timestamps, onset_dt=zeroed_stream_timestamps_dt, converted_dt=converted_dt, duration=([0.0] * len(zeroed_stream_timestamps_dt)), description=logger_strings))
+                # # a_raw_df: pd.DataFrame = pd.DataFrame(dict(onset=stream_datetimes, duration=([0.0] * len(zeroed_stream_timestamps_dt)), description=logger_strings))
+                # # all_annotations_dfs.append(a_raw_df)
+
+                # ## In lightweight mode, only collect bare stream metadata and skip heavy data processing:
+                # raw = mne.Annotations(onset=zeroed_stream_timestamps, duration=([0.0] * len(zeroed_stream_timestamps)), description=logger_strings, orig_time=stream_info_dict['stream_start_datetime']) ## set orig_time=None
+                
+            else:
+                ## fixed sampling rate streams:
+                _channels_dict = benedict(stream['info']['desc'][0]['channels'][0])
+                channels_df: pd.DataFrame = pd.DataFrame.from_records([{k:v[0] for k, v in ch_v.items()} for ch_v in _channels_dict.flatten()['channel']])
+                # data = np.array(stream['time_series']).T
+                # if (stream_info_dict['type'] == 'EEG'):
+                #     pass
+                # ch_names = [f"{name}_{i}" for i in range(data.shape[0])]
+                # ch_types = ["eeg"] * data.shape[0]  # adjust depending on stream type
+                ch_names = channels_df['label'].to_list()
+                ch_types = [lab_recorder_to_mne_to_type_dict[v] for v in channels_df['type']]
+                
+                info = mne.create_info(ch_names=ch_names, sfreq=fs, ch_types=ch_types)
+                info = info.set_meas_date(file_datetime)
+                info['description'] = self.xdf_data.file_path.as_posix()
+                info['device_info'] = {'type':'USB', 'model':'EpocX', 'serial': '', 'site':'pho', 'stream_info': {}} # #TODO 2025-09-22 08:51: - [ ] Add Hostname<USB> or Hostname<BLE>
+                # info['temp']
+                ## add in the 'stream_info' properties:
+                info['device_info']['stream_info'] = {}
+                for k, v in stream_info_dict.items():
+                    info['device_info']['stream_info'][k] = deepcopy(v)
+
+                # raw = mne.io.RawArray(data, info) ## also have , first_samp=0
+
+
+        except Exception as e:
+            if fail_on_exception:
+                raise
+            else:
+                print(f'_try_helper_parse_custom_stream_info(stream: {stream}, ...): \n\terror: {e}\n\tcontinuing...')
+
+
+
+
+
         return stream_info_dict
 
 
-    def _try_pho_custom_parse_stream_info(self, stream: dict, stream_id: int, skipped_stream_names=None, file_datetime=None, debug_print:bool=True) -> Optional[StreamInfo]:
+    def _try_pho_custom_parse_stream_info(self, stream: dict, stream_id: int, skipped_stream_names=None, file_datetime=None, debug_print:bool=True, is_python_xdf_streamer_format: bool=True) -> Optional[StreamInfo]:
         """ 
         stream_info_dict, stream_datetimes, stream_timestamp_df = 
 
@@ -174,7 +252,6 @@ class XdfLoader:
         
         fs = float(stream['info']['nominal_srate'][0])
         stream_info_dict: Dict = {'name': name, 'fs': fs}
-
         # sample_count: int = stream['footer']['info']['sample_count'][0]
 
         if (len(stream['time_series']) == 0):
@@ -266,6 +343,16 @@ class XdfLoader:
             # a_raw_df: pd.DataFrame = pd.DataFrame(dict(onset=zeroed_stream_timestamps, onset_dt=zeroed_stream_timestamps_dt, duration=([0.0] * len(zeroed_stream_timestamps_dt)), description=logger_strings))
             # all_annotations.append(a_raw_df)
 
+            
+            try:
+                _channels_dict = benedict(stream['info']['desc'][0]['channels'][0])
+            except IndexError as e:
+                ## happens for non-data channels
+                _channels_dict = None
+            except Exception as e:
+                raise e
+
+
             ## UPDATE: `streams_timestamp_dfs`
             stream_timestamp_df = pd.DataFrame(dict(stream_timestamps=stream_timestamps,
                 zeroed_stream_timestamps=zeroed_stream_timestamps, zeroed_stream_timestamps_dt=zeroed_stream_timestamps_dt,
@@ -276,6 +363,13 @@ class XdfLoader:
             # ## In lightweight mode, only collect bare stream metadata and skip heavy data processing:
             # if not should_load_full_file_data:
             #     continue
+
+            if is_python_xdf_streamer_format:
+                PhoOfflineEEGAnalysis_to_python_xdf_streamer_format_map = {'fs': 'sampling_rate', 'nominal_srate': 'effective_srate'}
+                for (old_k, new_k) in PhoOfflineEEGAnalysis_to_python_xdf_streamer_format_map.items():
+                    if old_k in stream_info_dict:
+                        assert new_k not in stream_info_dict, f"new_k already exists in stream_info_dict: {new_k}, stream_info_dict.keys(): {list(stream_info_dict.keys())}"
+                        stream_info_dict[new_k] = stream_info_dict.pop(old_k)
 
             return stream_info_dict, stream_datetimes, stream_timestamp_df
 
@@ -326,7 +420,7 @@ class XdfLoader:
         ## Custom Parsing:
         fs = float(stream['info']['nominal_srate'][0])
         stream_info_dict: Dict = {'name': name, 'fs': fs}
-        stream_info_dict = self._try_helper_parse_custom_stream_info(stream=stream, stream_info_dict=stream_info_dict, file_datetime=file_datetime, fail_on_exception=False)
+        stream_info_dict = self._try_helper_parse_custom_stream_info(stream=stream, stream_info_dict=stream_info_dict, file_datetime=self.xdf_data.file_datetime, fail_on_exception=False)
 
         # Parse channel information: desc may be at stream level or under info (pyxdf layout)
         channels = []
