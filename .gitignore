@@ -12,3 +12,6 @@ wheels/
 # Environment variables
 .env
 **/desktop.ini
+.cursorignore
+.cursorindexingignore*
+.cursor/rules/derived-cursor-rules.mdc
