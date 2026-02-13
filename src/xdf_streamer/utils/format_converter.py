@@ -39,7 +39,7 @@ def map_channel_format(xdf_format: str) -> int:
     """Map XDF channel format string to LSL channel format constant.
 
     Args:
-        xdf_format: XDF channel format string (e.g., "float32", "double64")
+        xdf_format: XDF channel format string (e.g., "float32", "cf_float32", "double64")
 
     Returns:
         LSL channel format constant
@@ -48,6 +48,8 @@ def map_channel_format(xdf_format: str) -> int:
         ValueError: If format is not supported
         RuntimeError: If pylsl/libsl is not available
     """
+    if isinstance(xdf_format, str) and xdf_format.startswith("cf_"):
+        xdf_format = xdf_format[3:]
     format_map = _get_channel_format_map()
     if xdf_format not in format_map:
         raise ValueError(f"Unsupported channel format: {xdf_format}")

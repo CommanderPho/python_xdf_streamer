@@ -1,5 +1,6 @@
 """LSL stream creation and management."""
 
+import math
 from typing import List, Optional
 
 # Try to ensure liblsl is available before importing pylsl
@@ -42,17 +43,22 @@ class LslStreamer:
         Returns:
             Configured LSL StreamInfo object
         """
+        name = (stream_info.name or "").strip() or "UnnamedStream"
         if source_id is None:
-            source_id = f"RT_Sender_SimulationPC_{stream_info.name}"
+            source_id = f"RT_Sender_SimulationPC_{name}"
 
         channel_format = map_channel_format(stream_info.channel_format)
+        channel_count = max(1, int(stream_info.channel_count)) if stream_info.channel_count is not None else 1
+        nominal_srate = float(stream_info.sampling_rate) if stream_info.sampling_rate is not None else pylsl.IRREGULAR_RATE
+        if not math.isfinite(nominal_srate):
+            nominal_srate = pylsl.IRREGULAR_RATE
 
         # Create stream info
         info = pylsl.StreamInfo(
-            name=stream_info.name,
-            type=stream_info.type,
-            channel_count=stream_info.channel_count,
-            nominal_srate=stream_info.sampling_rate,
+            name=name,
+            type=stream_info.type or "",
+            channel_count=channel_count,
+            nominal_srate=nominal_srate,
             channel_format=channel_format,
             source_id=source_id,
         )
@@ -63,6 +69,7 @@ class LslStreamer:
             for channel in stream_info.channels:
                 chn = desc.append_child("channel")
                 for key, value in channel.items():
-                    chn.append_child_value(key, str(value))
+                    v = value[0] if isinstance(value, list) and value else value
+                    chn.append_child_value(key, str(v))
 
         return info

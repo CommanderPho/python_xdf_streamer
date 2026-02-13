@@ -24,6 +24,8 @@ def validate_stream(stream_info: StreamInfo) -> tuple[bool, str]:
     Returns:
         Tuple of (is_valid, error_message)
     """
+    if not (stream_info.name or "").strip():
+        return False, "Stream has no name"
     # Ensure sampling_rate is a float (defensive check)
     sampling_rate = float(stream_info.sampling_rate) if not isinstance(stream_info.sampling_rate, (int, float)) else float(stream_info.sampling_rate)
     

@@ -11,6 +11,9 @@
 		},
 		{
 			"path": "../lab-recorder-python"
+		},
+		{
+			"path": "../PhoOfflineEEGAnalysis"
 		}
 	],
 	"settings": {
