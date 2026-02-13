@@ -21,6 +21,13 @@ def test_map_channel_format():
     assert map_channel_format("int16") == pylsl.cf_int16
 
 
+def test_map_channel_format_strips_cf_prefix():
+    """XDF/pyxdf often use 'cf_float32'; map_channel_format normalizes by stripping 'cf_'."""
+    assert map_channel_format("cf_float32") == pylsl.cf_float32
+    assert map_channel_format("cf_double64") == pylsl.cf_double64
+    assert map_channel_format("cf_int16") == pylsl.cf_int16
+
+
 def test_map_channel_format_invalid():
     """Test format mapping with invalid format."""
     with pytest.raises(ValueError):

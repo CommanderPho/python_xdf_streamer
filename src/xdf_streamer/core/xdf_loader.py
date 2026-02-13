@@ -23,8 +23,9 @@ from ..models.xdf_data import XdfData
 class XdfLoader:
     """Load and parse XDF files."""
 
-    def __init__(self):
+    def __init__(self, debug_logging: bool=False):
         """Initialize XDF loader."""
+        self.debug_logging = debug_logging
         self.xdf_data: XdfData = XdfData()
 
     def load_xdf(self, file_path: Path | str) -> XdfData:
@@ -70,9 +71,13 @@ class XdfLoader:
 
         for stream_id, stream in enumerate(streams):
             parsed_stream_successfully: bool = False
-            stream_info_dict = {}
+            stream_info_dict: Dict = {}
+            stream_info: Optional[StreamInfo] = None
             try:
-                stream_info_dict, stream_datetimes, stream_timestamp_df = self._try_pho_custom_parse_stream_info(stream=stream, stream_id=stream_id, file_datetime=self.xdf_data.file_datetime)
+                result = self._try_pho_custom_parse_stream_info(stream=stream, stream_id=stream_id, file_datetime=self.xdf_data.file_datetime, debug_print=self.debug_logging)
+                if result is None:
+                    continue
+                stream_info_dict, stream_datetimes, stream_timestamp_df = result
                 # streams_timestamp_dfs[name] = stream_timestamp_df
                 if 'channels' not in stream_info_dict:
                     stream_info_dict['channels'] = None
@@ -86,6 +91,9 @@ class XdfLoader:
 
             if not parsed_stream_successfully:
                 stream_info = self._parse_stream_info(stream, stream_id)
+                self.xdf_data.streams.append(stream_info)
+            else:
+                assert stream_info is not None  # set in try when parsed_stream_successfully became True
                 self.xdf_data.streams.append(stream_info)
 
             # Extract time series data
@@ -101,7 +109,7 @@ class XdfLoader:
         return self.xdf_data
 
 
-    def _try_helper_parse_custom_stream_info(self, stream: dict, stream_info_dict: dict, file_datetime: datetime, fail_on_exception: bool=False) -> Dict:
+    def _try_helper_parse_custom_stream_info(self, stream: dict, stream_info_dict: dict, file_datetime: datetime, fail_on_exception: bool=True) -> Dict:
         ## stream info keys:
         for a_key in ('type', 'stream_id', 'effective_srate', 'hostname', 'source_id', 'channel_count', 'channel_format', 'type', 'created_at', 'source_id', 'version', 'uid'):
             try:
@@ -114,7 +122,8 @@ class XdfLoader:
                 if fail_on_exception:
                     raise
                 else:
-                    print(f'_try_helper_parse_custom_stream_info(stream: {stream}, ...): \n\terror: {e}\n\tcontinuing...')
+                    if self.debug_logging:
+                        print(f'_try_helper_parse_custom_stream_info(stream... ...): \n\terror: {e}\n\tcontinuing...')
             
         ## stream footer:
         for a_key in ('first_timestamp', 'last_timestamp', 'sample_count'):
@@ -128,7 +137,8 @@ class XdfLoader:
                 if fail_on_exception:
                     raise
                 else:
-                    print(f'_try_helper_parse_custom_stream_info(stream: {stream}, ...): \n\terror: {e}\n\tcontinuing...')
+                    if self.debug_logging:
+                        print(f'_try_helper_parse_custom_stream_info(stream... ...): \n\terror: {e}\n\tcontinuing...')
 
 
         ## Update the timestamp keys to float values, and the create a datetime column by adding them to the `file_datetime`
@@ -140,13 +150,15 @@ class XdfLoader:
                     a_ts_value_dt: datetime = file_datetime + pd.Timedelta(nanoseconds=a_ts_value)
                     a_dt_key: str = f'{a_key}_dt'
                     stream_info_dict[a_dt_key] = a_ts_value_dt
-                    print(f'\t{a_dt_key}: {readable_dt_str(a_ts_value_dt)}')
+                    if self.debug_logging:
+                        print(f'\t{a_dt_key}: {readable_dt_str(a_ts_value_dt)}')
 
             except Exception as e:
                 if fail_on_exception:
                     raise
                 else:
-                    print(f'_try_helper_parse_custom_stream_info(stream: {stream}, ...): \n\terror: {e}\n\tcontinuing...')
+                    if self.debug_logging:
+                        print(f'_try_helper_parse_custom_stream_info(stream...): \n\terror: {e}\n\tcontinuing...')
 
         ## try to get the special marker timestamp helpers:
         try:
@@ -156,7 +168,8 @@ class XdfLoader:
             if fail_on_exception:
                 raise
             else:
-                print(f'_try_helper_parse_custom_stream_info(stream: {stream}, ...): \n\terror: {e}\n\tcontinuing...')
+                if self.debug_logging:
+                    print(f'_try_helper_parse_custom_stream_info(stream... ...): \n\terror: {e}\n\tcontinuing...')
 
 
 
@@ -215,7 +228,7 @@ class XdfLoader:
             if fail_on_exception:
                 raise
             else:
-                print(f'_try_helper_parse_custom_stream_info(stream: {stream}, ...): \n\terror: {e}\n\tcontinuing...')
+                print(f'_try_helper_parse_custom_stream_info(stream... ...): \n\terror: {e}\n\tcontinuing...')
 
 
 
@@ -224,7 +237,7 @@ class XdfLoader:
         return stream_info_dict
 
 
-    def _try_pho_custom_parse_stream_info(self, stream: dict, stream_id: int, skipped_stream_names=None, file_datetime=None, debug_print:bool=True, is_python_xdf_streamer_format: bool=True) -> Optional[StreamInfo]:
+    def _try_pho_custom_parse_stream_info(self, stream: dict, stream_id: int, skipped_stream_names=None, file_datetime=None, debug_print:bool=False, is_python_xdf_streamer_format: bool=True) -> Optional[StreamInfo]:
         """ 
         stream_info_dict, stream_datetimes, stream_timestamp_df = 
 

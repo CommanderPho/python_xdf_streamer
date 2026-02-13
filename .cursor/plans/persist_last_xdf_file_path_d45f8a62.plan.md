@@ -17,6 +17,7 @@ todos:
   - id: save_last_path
     content: Save selected file directory to QSettings after file selection
     status: completed
+isProject: false
 ---
 
 # Persist Last XDF File Path
@@ -29,7 +30,7 @@ Implement persistent storage of the last used directory path when selecting .xdf
 
 ### 1. Update MainWindow to Use QSettings
 
-**File**: [`src/xdf_streamer/gui/main_window.py`](src/xdf_streamer/gui/main_window.py)
+**File**: `[src/xdf_streamer/gui/main_window.py](src/xdf_streamer/gui/main_window.py)`
 
 - Import `QSettings` from `PyQt6.QtCore`
 - Add a `QSettings` instance in `__init__` to manage persistent settings
@@ -37,7 +38,7 @@ Implement persistent storage of the last used directory path when selecting .xdf
 
 ### 2. Load Last Path on Initialization
 
-**File**: [`src/xdf_streamer/gui/main_window.py`](src/xdf_streamer/gui/main_window.py)
+**File**: `[src/xdf_streamer/gui/main_window.py](src/xdf_streamer/gui/main_window.py)`
 
 - In `__init__`, load the last used directory from QSettings
 - Store it as an instance variable (e.g., `self.last_xdf_directory`)
@@ -45,7 +46,7 @@ Implement persistent storage of the last used directory path when selecting .xdf
 
 ### 3. Update File Dialog to Use Last Path
 
-**File**: [`src/xdf_streamer/gui/main_window.py`](src/xdf_streamer/gui/main_window.py)
+**File**: `[src/xdf_streamer/gui/main_window.py](src/xdf_streamer/gui/main_window.py)`
 
 - Modify `_on_browse_clicked()` method (line 175-181)
 - Change `QFileDialog.getOpenFileName()` to use `self.last_xdf_directory` as the initial directory instead of empty string
@@ -53,7 +54,7 @@ Implement persistent storage of the last used directory path when selecting .xdf
 
 ### 4. Save Path When File is Selected
 
-**File**: [`src/xdf_streamer/gui/main_window.py`](src/xdf_streamer/gui/main_window.py)
+**File**: `[src/xdf_streamer/gui/main_window.py](src/xdf_streamer/gui/main_window.py)`
 
 - In `_on_browse_clicked()`, after a file is selected:
 - Extract the directory from the selected file path using `Path(file_path).parent`
@@ -82,3 +83,4 @@ Implement persistent storage of the last used directory path when selecting .xdf
 - Cross-platform: QSettings handles Windows registry, macOS plist, and Linux config files automatically
 - No external dependencies: Uses built-in Qt functionality
 - Persistent: Settings survive application restarts
+

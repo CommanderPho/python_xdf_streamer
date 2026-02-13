@@ -82,3 +82,21 @@ def test_outlet_channel_metadata_list_values_written_as_strings():
     lsl_info = streamer._configure_stream_metadata(stream_info, None)
     labels = _channel_labels_from_lsl_info(lsl_info)
     assert labels == ["Fp1", "Fp2"], "Channel labels must be normalized strings, not list repr"
+
+
+def test_create_outlet_empty_name_uses_fallback():
+    """Creating outlet with empty name uses fallback 'UnnamedStream' so LSL accepts it."""
+    streamer = LslStreamer()
+    stream_info = StreamInfo(
+        name="",
+        type="EEG",
+        channel_count=2,
+        sampling_rate=100.0,
+        channel_format="float32",
+        channels=[],
+        stream_id=0,
+    )
+    lsl_info = streamer._configure_stream_metadata(stream_info, None)
+    assert lsl_info.name() == "UnnamedStream"
+    outlet = streamer.create_outlet(stream_info)
+    assert outlet is not None

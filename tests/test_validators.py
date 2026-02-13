@@ -28,6 +28,20 @@ def test_validate_stream():
     assert is_valid is True
     assert msg == ""
 
+    # Test empty name
+    empty_name_stream = StreamInfo(
+        name="",
+        type="EEG",
+        channel_count=32,
+        sampling_rate=1000.0,
+        channel_format="float32",
+        channels=[],
+        stream_id=0,
+    )
+    is_valid, msg = validate_stream(empty_name_stream)
+    assert is_valid is False
+    assert "name" in msg.lower()
+
     # Test irregular rate
     irregular_stream = StreamInfo(
         name="TestStream",

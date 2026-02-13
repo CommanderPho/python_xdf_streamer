@@ -10,6 +10,7 @@ todos:
     status: pending
     dependencies:
       - create_tasks_json
+isProject: false
 ---
 
 # Auto-discover Script Launchers from pyproject.toml
@@ -47,7 +48,7 @@ The structure will make it easy to add more scripts as they're added to `pyproje
 
 ## Files to Create/Modify
 
-- **`.vscode/tasks.json`** (new file): VS Code tasks configuration with launcher tasks
+- `**.vscode/tasks.json**` (new file): VS Code tasks configuration with launcher tasks
 
 ## Example Task Format
 
